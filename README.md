@@ -1,0 +1,1 @@
+Designed, implemented, and applied core operating system concepts. Explored fundamental mechanics such as virtual memory, file systems, threads, inter-process communication, coordination, and the interaction between software and hardware. Developing and modifying components directly within the xv6 multiprocessor operating system.
