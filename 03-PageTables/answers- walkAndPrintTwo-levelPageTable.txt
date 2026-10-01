@@ -1,0 +1,11 @@
+
+Explanation of vmprint output and its relation to print_pgtbl:
+
+The vmprint function outputs the entire page table tree hierarchically 
+- Non-leaf PTEs point to lower-level page tables and lack R, W, and X permissions.
+- Leaf PTEs point to the actual physical pages and contain permissions (like R, W, X, U). 
+The leaf pages printed by vmprint correspond directly to the same user-space and system pages we 
+inspected earlier in print_pgtbl The virtual addresses and page permissions match, 
+but vmprint shows the full tree structure and how the
+hardware navigates from the root page table down to each specific physical page.
+

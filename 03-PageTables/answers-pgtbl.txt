@@ -1,0 +1,84 @@
+1. va 0x0 pte 0x21FC885B pa 0x87F22000 perm 0x5B
+This is the first page of the text segment. 
+The permission 0x5B means it is Valid, Readable, Executable, User-accessible, 
+and has the Accessed bit set (V, R, X, U, A). We know this is the text segment
+because it starts at virtual address 0 and is the only user memory with the Execute permission.
+
+2. va 0x1000 pte 0x21FC7C1B pa 0x87F1F000 perm 0x1B
+This is the second page of the text segment. 
+The permission 0x1B means it is Valid, Readable, Executable, and User-accessible (V, R, X, U). 
+Like the first page, the Execute bit confirms it contains code.
+
+3. va 0x2000 pte 0x21FC7817 pa 0x87F1E000 perm 0x17
+This is the data segment, which holds global variables. 
+The permission 0x17 means it is Valid, Readable, Writable, and User-accessible (V, R, W, U). 
+We know this is the data segment because it immediately follows the code, has Write permissions, 
+but lacks the Execute bit.
+
+4. va 0x3000 pte 0x21FC7407 pa 0x87F1D000 perm 0x7
+This is the guard page. 
+The permission 0x7 means it is Valid, Readable, and Writable (V, R, W),
+but it intentionally lacks the User bit.
+We know this is the guard page because it sits exactly between
+the data segment and the stack; the missing User bit guarantees
+page fault if the stack overflows into it.
+
+5. va 0x4000 pte 0x21FC70D7 pa 0x87F1C000 perm 0xD7
+This is the user stack page. The permission 0xD7 means it is 
+Valid, Readable, Writable, User-accessible, Accessed, and Dirty (V, R, W, U, A, D).
+We know this is the stack because it sits just above the guard page, 
+and its Dirty bit indicates the program has actively pushed variables onto it.
+
+6. va 0x5000 pte 0x0 pa 0x0 perm 0x0
+This is an unmapped memory page. The Valid bit is 0.
+We know it's unmapped empty space because without the Valid bit,
+he hardware treats it as non-existent memory.
+
+(7-18 are same are all unmapped and invalid pages because of 6's reasons)
+
+7. va 0x6000 pte 0x0 pa 0x0 perm 0x0
+Unmapped and invalid memory page. 
+
+8. va 0x7000 pte 0x0 pa 0x0 perm 0x0
+Unmapped and invalid memory page.
+
+9. va 0x8000 pte 0x0 pa 0x0 perm 0x0
+Unmapped and invalid memory page.
+
+10. va 0x9000 pte 0x0 pa 0x0 perm 0x0
+Unmapped and invalid memory page.
+
+11. va 0x3FFFFF6000 pte 0x0 pa 0x0 perm 0x0
+Unmapped and invalid memory page.
+
+12. va 0x3FFFFF7000 pte 0x0 pa 0x0 perm 0x0
+Unmapped and invalid memory page.
+
+13. va 0x3FFFFF8000 pte 0x0 pa 0x0 perm 0x0
+Unmapped and invalid memory page.
+
+14. va 0x3FFFFF9000 pte 0x0 pa 0x0 perm 0x0
+Unmapped and invalid memory page.
+
+15. va 0x3FFFFFA000 pte 0x0 pa 0x0 perm 0x0
+Unmapped and invalid memory page.
+
+16. va 0x3FFFFFB000 pte 0x0 pa 0x0 perm 0x0
+Unmapped and invalid memory page.
+
+17. va 0x3FFFFFC000 pte 0x0 pa 0x0 perm 0x0
+Unmapped and invalid memory page.
+
+18. va 0x3FFFFFD000 pte 0x0 pa 0x0 perm 0x0
+Unmapped and invalid memory page, located right before the trapframe.
+
+19. va 0x3FFFFFE000 pte 0x21FD08C7 pa 0x87F42000 perm 0xC7
+This is the trapframe page. The permission 0xC7 (V, R, W, A, D) means it is readable and writable by the kernel
+but lacks the User bit. We know this is the trapframe because xv6 always maps it right below the trampoline so 
+the kernel can save user registers during a trap.
+
+20. va 0x3FFFFFF000 pte 0x2000184B pa 0x80006000 perm 0x4B
+This is the trampoline page. The permission 0x4B (V, R, X, A) shows it is executable by the kernel but lacks the User bit.
+We know this is the trampoline because it sits at the absolute maximum virtual address 
+and requires the Execute bit to run context-switching code.
+

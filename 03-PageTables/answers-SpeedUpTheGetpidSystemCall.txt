@@ -1,0 +1,5 @@
+The uptime() system call could be made faster using this shared page approach.
+The kernel could map a read-only page to userspace containing the current number of clock ticks 
+kernel would update this specific memory location on every timer interrupt. 
+This would allow userspace programs to check the system time directly by reading from their own memory space
+entirely avoiding the expensive context switch overhead of trapping into the kernel.

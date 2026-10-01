@@ -1,0 +1,6 @@
+
+
+My solution uses approximately 63 superpage PTEs. 
+kernel physical memory ranges up to 128MB, meaning most of it can be covered by 2MB superpages.
+Each 2MB superpage saves one Level-0 page table directory and eliminates the need for 512 bottom-levelPTEs. 
+using 63 superpages saves 63 Level-0 page tables and avoids creating 32,256 individual bottom-level page translation
