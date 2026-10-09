@@ -286,6 +286,8 @@ kfork(void)
     if (p->ofile[i])
       np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
+  np->mask = p->mask;
+  memmove(np->path, p->path, 128);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
@@ -698,4 +700,6 @@ procdump(void)
     printk("%d %s %s", p->pid, state, p->name);
     printk("\n");
   }
+
+
 }

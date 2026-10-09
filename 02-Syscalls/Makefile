@@ -203,9 +203,9 @@ UPROGS=\
 	$U/_forphan\
 	$U/_dorphan\
 	$U/_sync\
-	$U/_sleep\
-	$U/_sixfive\
-	$U/_find\
+	$U/_sandbox\
+	$U/_attack\
+
 
 
 
@@ -375,7 +375,7 @@ grade:
 ##
 
 submit-check:
-	@if ! test -d .git; then \
+	@if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
 		echo No .git directory, is this a git repository?; \
 		false; \
 	fi

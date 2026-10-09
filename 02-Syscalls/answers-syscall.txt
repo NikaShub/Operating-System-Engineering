@@ -1,0 +1,6 @@
+1- usertrap
+2- 0xf, it is syscall id
+3- user mode
+4- instruction: lw a3,0(zero)     register: a3
+5- Address 0 is not mapped in the kernel address space, which caused a Load page fault (scause=0xd)
+6- name = "init", id = 1

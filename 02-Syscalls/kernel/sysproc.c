@@ -110,3 +110,14 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_interpose(void) {
+    struct proc *p = myproc();
+    argint(0, &p->mask);
+  
+    if(argstr(1, p->path, 128) < 0) {
+     return -1;
+    }
+    return 0;
+}
