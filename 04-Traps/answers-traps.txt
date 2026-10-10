@@ -9,13 +9,17 @@
 4- jal insturction will store next line of adress, which is exit(0) in 3c, adress 0x3c and it will be stored in ra
 
 
-5-  output is He110 World
+5-  5- Output: He110 World
 
-    in big eldian we just have to rotate numbers because it will store left to right,
-    so we should give i 0x726c6400
+57616 converted to hex is e110, so H%x prints He110 Since RISC-V is little-endian, 
+i = 0x00646c72 is stored in memory byte by byte as 'r', 'l', 'd', '\0', which %s prints as "rld".
 
-    no, this will be printed same, it will just convert it to 16ths and that it it does not have a 
-    problem whether it is big or small eldian, output will be same
+For a big-endian system, we would need to change i to 0x726c6400.
+big elndian stores the highest byte first so 0x726c6400 puts 'r' (0x72) at the start in memory 
+and \0 (0x00) at the end.
+
+No, we don need to change 57616. it passed directly as an integer in a register
+not read bytebyte from memory, so endianness doesn't affect it.
 
 6-  funqtion requires 2 arguments and we give only 1 which is 3, so compilator for first one will go to a1 and 
     takes 3, but for "y=%d" it will go to a2, and we did not set value in it because we only gave 1 argument, 
