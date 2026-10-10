@@ -1,0 +1,22 @@
+1- a0-a7 contains arguments for functions. 
+    in printf, the value 13 is in a2, a1 = 12, and in a0 there is pointer to format string
+
+2- there is no jal in main, because compilator inclined those funqtions f and g
+   and calculate their value in advance li a1, 12 and store here.
+
+3- 0000000000000746  (0000000000000746 <printf>:)
+
+4- jal insturction will store next line of adress, which is exit(0) in 3c, adress 0x3c and it will be stored in ra
+
+
+5-  output is He110 World
+
+    in big eldian we just have to rotate numbers because it will store left to right,
+    so we should give i 0x726c6400
+
+    no, this will be printed same, it will just convert it to 16ths and that it it does not have a 
+    problem whether it is big or small eldian, output will be same
+
+6-  funqtion requires 2 arguments and we give only 1 which is 3, so compilator for first one will go to a1 and 
+    takes 3, but for "y=%d" it will go to a2, and we did not set value in it because we only gave 1 argument, 
+    so it will just store whatever is in a2, at that time, some other funqtions value, garbage value.
