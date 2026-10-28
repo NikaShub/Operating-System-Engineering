@@ -1,48 +1,229 @@
-xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
-Version 6 (v6).  xv6 loosely follows the structure and style of v6,
-but is implemented for a modern RISC-V multiprocessor using ANSI C.
+Memory allocator (moderate)
 
-ACKNOWLEDGMENTS
+The program user/kalloctest stresses xv6's memory allocator: three processes grow and shrink their address spaces, resulting in many calls to kalloc and kfree. kalloc and kfree obtain kmem.lock. kalloctest prints (as "#test-and-set") the number of loop iterations in acquire due to attempts to acquire a lock that another core already holds, for the kmem lock and a few other locks. The number of loop iterations in acquire is a rough measure of lock contention. The output of kalloctest looks similar to this before you start the lab:
 
-xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
-to Peer Communications; ISBN: 1-57398-013-7; 1st edition (June 14,
-2000)).  See also https://pdos.csail.mit.edu/6.1810/, which provides
-pointers to on-line resources for v6.
+$ kalloctest
+start test1
+test1 results:
+--- lock kmem stats
+lock: kmem: #test-and-set 109387 #acquire() 433062
+--- top 5 contended locks:
+lock: proc: #test-and-set 175682 #acquire() 269903
+lock: proc: #test-and-set 134313 #acquire() 269902
+lock: virtio_disk: #test-and-set 114002 #acquire() 168
+lock: kmem: #test-and-set 109387 #acquire() 433062
+lock: proc: #test-and-set 51770 #acquire() 269904
+tot= 109387
+test1 FAIL
+start test2
+total free number of pages: 32465 (out of 32768)
+..........
+test2 OK
+start test3
+..........child done 10000
 
-The following people have made contributions: Russ Cox (context switching,
-locking), Cliff Frey (MP), Xiao Yu (MP), Nickolai Zeldovich, and Austin
-Clements.
+test3 OK
+start test4
+............................child done 100000
+.child done 100000
+.child done 100000
+--- lock kmem stats
+lock: kmem: #test-and-set 501926 #acquire() 3129957
+--- top 5 contended locks:
+lock: wait_lock: #test-and-set 17670749 #acquire() 40004
+lock: proc: #test-and-set 2471506 #acquire() 2552213
+lock: kmem: #test-and-set 501926 #acquire() 3129957
+lock: proc: #test-and-set 305810 #acquire() 2000185
+lock: proc: #test-and-set 181696 #acquire() 1130037
+tot= 501926
+test4 FAIL m 153305 n 501926
+$ 
 
-We are also grateful for the bug reports and patches contributed by
-Abhinavpatel00, Takahiro Aoyagi, Marcelo Arroyo, Hirbod Behnam, Silas
-Boyd-Wickizer, Anton Burtsev, carlclone, Ian Chen, clivezeng, Dan
-Cross, Cody Cutler, Mike CAT, Tej Chajed, Asami Doi,Wenyang Duan,
-echtwerner, eyalz800, Nelson Elhage, Saar Ettinger, Alice Ferrazzi,
-Nathaniel Filardo, flespark, Peter Froehlich, Yakir Goaron, Shivam
-Handa, Matt Harvey, Bryan Henry, jaichenhengjie, Jim Huang, Matúš
-Jókay, John Jolly, Alexander Kapshuk, Anders Kaseorg, kehao95,
-Wolfgang Keller, Jungwoo Kim, Jonathan Kimmitt, Eddie Kohler, Vadim
-Kolontsov, Austin Liew, Bruce Lowekamp, l0stman, Pavan Maddamsetti,
-Imbar Marinescu, Yandong Mao, Matan Shabtay, Hitoshi Mitake, Carmi
-Merimovich, mes900903, Mark Morrissey, mtasm, Joel Nider, Hayato Ohhashi,
-OptimisticSide, papparapa, phosphagos, Harry Porter, Greg Price, Zheng
-qhuo, Quancheng, RayAndrew, Jude Rich, segfault, Ayan Shafqat, Eldar
-Sehayek, Yongming Shen, Fumiya Shigemitsu, snoire, Taojie, Cam Tenny,
-tyfkda, Warren Toomey, Stephen Tu, Alissa Tung, Rafael Ubal, unicornx,
-Amane Uehara, Pablo Ventura, Luc Videau, Xi Wang, WaheedHafez, Keiichi
-Watanabe, Lucas Wolf, Nicolas Wolovick, wxdao, Grant Wu, x653, Andy
-Zhang, Jindong Zhang, Icenowy Zheng, ZhUyU1997, and Zou Chang Wei.
+You'll likely see different counts than shown here, and a different order for the top 5 contended locks.
 
-ERROR REPORTS
+acquire maintains, for each lock, the count of calls to acquire for that lock, and the number of times the loop in acquire tried but failed to set the lock. kalloctest calls a system call that causes the kernel to print those counts for the kmem locks (which are the focus of this lab) and for the 5 most contended locks. If there is lock contention the number of acquire loop iterations will be large. The system call returns the sum of the number of loop iterations for the kmem locks.
 
-Please send errors and suggestions to Frans Kaashoek and Robert Morris
-(kaashoek,rtm@mit.edu).  The main purpose of xv6 is as a teaching
-operating system for MIT's 6.1810, so we are more interested in
-simplifications and clarifications than new features.
+For this lab, you must use a dedicated unloaded machine with multiple cores. If you use a machine that is doing other things, the counts that kalloctest prints will be nonsense.
 
-BUILDING AND RUNNING XV6
+The root cause of lock contention in kalloctest is that kalloc() has a single free list, protected by a single lock. To remove lock contention, you will have to redesign the memory allocator to avoid a single lock and list. The basic idea is to maintain a free list per CPU, each list with its own lock. Allocations and frees on different CPUs can run in parallel, because each CPU will operate on a different list. The main challenge will be to deal with the case in which one CPU's free list is empty, but another CPU's list has free memory; in that case, the one CPU must "steal" part of the other CPU's free list. Stealing may introduce lock contention, but that will hopefully be infrequent.
 
-You will need a RISC-V "newlib" tool chain from
-https://github.com/riscv/riscv-gnu-toolchain, and qemu compiled for
-riscv64-softmmu.  Once they are installed, and in your shell
-search path, you can run "make qemu".
+Your job is to implement per-CPU freelists, and stealing when a CPU's free list is empty. You must give all of your locks names that start with "kmem". That is, you should call initlock for each of your locks, and pass a name that starts with "kmem". Run kalloctest to see if your implementation has reduced lock contention. To check that it can still allocate all of memory, run usertests sbrkmuch. Your output will look similar to that shown below, with much-reduced contention in total on kmem locks, although the specific numbers will differ. Make sure all tests in usertests -q pass. make grade should say that the kalloctests pass.
+
+$ kalloctest
+start test1
+test1 results:
+--- lock kmem stats
+lock: kmem: #test-and-set 0 #acquire() 117911
+lock: kmem: #test-and-set 0 #acquire() 169464
+lock: kmem: #test-and-set 0 #acquire() 145786
+--- top 5 contended locks:
+lock: virtio_disk: #test-and-set 93747 #acquire() 183
+lock: proc: #test-and-set 44010 #acquire() 526316
+lock: proc: #test-and-set 24347 #acquire() 526309
+lock: wait_lock: #test-and-set 11726 #acquire() 12
+lock: pr: #test-and-set 4579 #acquire() 5
+tot= 0
+test1 OK
+start test2
+total free number of pages: 32463 (out of 32768)
+..........
+test2 OK
+start test3
+..........child done 10000
+
+test3 OK
+start test4
+..........child done 100000
+--- lock kmem stats
+lock: kmem: #test-and-set 3673 #acquire() 827384
+lock: kmem: #test-and-set 3449 #acquire() 1215152
+lock: kmem: #test-and-set 1924 #acquire() 1236349
+lock: kmem: #test-and-set 0 #acquire() 1014
+lock: kmem: #test-and-set 0 #acquire() 1014
+lock: kmem: #test-and-set 0 #acquire() 1014
+lock: kmem: #test-and-set 0 #acquire() 1014
+lock: kmem: #test-and-set 0 #acquire() 1014
+--- top 5 contended locks:
+lock: wait_lock: #test-and-set 39121537 #acquire() 40020
+lock: proc: #test-and-set 6853704 #acquire() 1672258
+lock: proc: #test-and-set 214194 #acquire() 1614201
+lock: uart: #test-and-set 195773 #acquire() 1459
+lock: virtio_disk: #test-and-set 93747 #acquire() 183
+tot= 9046
+
+test4 OK
+$ usertests sbrkmuch
+usertests starting
+test sbrkmuch: OK
+ALL TESTS PASSED
+$ usertests -q
+...
+ALL TESTS PASSED
+$
+
+Hints
+
+    You can use the constant NCPU from kernel/param.h
+    Let freerange give all free memory to the CPU running freerange.
+    The function cpuid returns the current core number, but it's only safe to call it and use its result when interrupts are turned off. You should use push_off() and pop_off() to turn interrupts off and on.
+    Have a look at the snprintf function in kernel/sprintf.c for string formatting ideas. It is OK to just name all locks "kmem" though.
+    Optionally run your solution using xv6's race detector:
+
+    	$ make clean
+    	$ make KCSAN=1 qemu
+    	$ kalloctest
+    	  ..
+          
+
+    The kalloctest may fail but you shouldn't see any races. If the xv6's race detector observes a race, it will print two stack traces describing the races along the following lines:
+
+    	 == race detected ==
+    	 backtrace for racing load
+    	 0x000000008000ab8a
+    	 0x000000008000ac8a
+    	 0x000000008000ae7e
+    	 0x0000000080000216
+    	 0x00000000800002e0
+    	 0x0000000080000f54
+    	 0x0000000080001d56
+    	 0x0000000080003704
+    	 0x0000000080003522
+    	 0x0000000080002fdc
+    	 backtrace for watchpoint:
+    	 0x000000008000ad28
+    	 0x000000008000af22
+    	 0x000000008000023c
+    	 0x0000000080000292
+    	 0x0000000080000316
+    	 0x000000008000098c
+    	 0x0000000080000ad2
+    	 0x000000008000113a
+    	 0x0000000080001df2
+    	 0x000000008000364c
+    	 0x0000000080003522
+    	 0x0000000080002fdc
+    	 ==========
+          
+
+    On your OS, you can turn a backtrace into function names with line numbers by cutting and pasting it into addr2line:
+
+    	 $ riscv64-linux-gnu-addr2line -e kernel/kernel
+    	 0x000000008000ab8a
+    	 0x000000008000ac8a
+    	 0x000000008000ae7e
+    	 0x0000000080000216
+    	 0x00000000800002e0
+    	 0x0000000080000f54
+    	 0x0000000080001d56
+    	 0x0000000080003704
+    	 0x0000000080003522
+    	 0x0000000080002fdc
+    	ctrl-d
+    	kernel/kcsan.c:157
+            kernel/kcsan.c:241
+            kernel/kalloc.c:174
+            kernel/kalloc.c:211
+            kernel/vm.c:255
+            kernel/proc.c:295
+            kernel/sysproc.c:54
+            kernel/syscall.c:251
+            ...
+          
+
+    You are not required to run the race detector, but you might find it helpful. Note that the race detector slows xv6 down significantly, so you probably don't want to use it when running usertests. 
+
+Read-write lock (moderate)
+
+This half of the assignment is independent from the first half; you can work on this half (and pass the tests) whether or not you have completed the first half.
+
+Consider xv6's sys_pause and sys_uptime functions, which read the global ticks variable. Since that variable might be concurrently updated by clockintr, these two functions acquire the tickslock spinlock before reading ticks. Importantly, this prevents clockintr from concurrently modifying ticks, but this also prevents multiple cores from reading ticks at the same time, which would have been just fine. In the latter case, the spinlock needlessly reduces performance.
+
+A common solution to this problem is to use a read-write lock. Read-write locks introduce the notion of two kinds of lock holders: readers and writers. There can be at most one writer at a time (and when there's a writer, there can be no readers), but there can be many readers at the same time (as long as there's no writer). The typical read-write lock API is as follows (see kernel/defs.h):
+
+void            initrwlock(struct rwspinlock*);
+void            read_acquire(struct rwspinlock*);
+void            read_release(struct rwspinlock*);
+void            write_acquire(struct rwspinlock*);
+void            write_release(struct rwspinlock*);
+
+One subtle issue that can arise with read-write locks is that, if there are many readers, then writers might never get a chance to run. In other words, even though readers keep acquiring and releasing the lock, there's never a point when there are actually zero readers, so a writer might never be able to acquire the lock. To address this problem, read-write locks typically implement a writer priority scheme: once a writer tries to acquire the lock, subsequent readers must wait until the writer succeeds in acquiring and releasing the lock (of course, waiting for the current readers to release the lock before allowing the writer to acquire).
+
+Your implementation of read_acquire must never wait for another CPU that's holding a read-lock, or in the process of acquiring or releasing a read-lock. (This property is technically called "wait-free".) This means that your implementation cannot acquire a spinlock to implement the read-write lock---that would mean that one core that wants to acquire a read-lock would have to potentially wait for other cores that are also acquiring a read-lock. Instead, you should directly use atomic operations.
+
+Implement a read-write spinlock in xv6, following the API and semantics described above. Make sure that readers do not starve writers: if there are any pending writers, no more readers can acquire the lock.
+
+You will need to fill in the stubbed-out functions for the read-write spinlock API in kernel/spinlock.c, and likely change the definition of a struct rwspinlock in kernel/spinlock.h.
+
+When you are done, test your rwspinlock implementation by running rwlktest. You should see output similar to the following:
+
+$ rwlktest
+rwspinlock_test: step 1: initrwlock
+rwspinlock_test: step 2: concurrent read_acquire
+rwspinlock_test: step 3: concurrent read_release
+rwspinlock_test: step 4: wait-free read acquire/release
+rwspinlock_test: step 5: prepare read_acquire for writer priority test
+rwspinlock_test: step 6: writer priority test
+rwspinlock_test: step 7: checking for concurrent readers/writers
+rwspinlock_test: step 8: checking for concurrent writers
+rwspinlock_test: step 9: acquiring multiple locks
+rwspinlock_test: step 10: releasing multiple locks
+rwspinlock_test: step 11: prepare read_acquire for multiple writer priority test
+rwspinlock_test: step 12: multiple writer priority test
+...
+rwspinlock_test: step 29: prepare read_acquire for multiple writer priority test
+rwspinlock_test: step 30: multiple writer priority test
+rwspinlock_test: step 31: done
+rwspinlock_test(1): 0
+rwspinlock_test(0): 0
+rwspinlock_test(2): 0
+rwspinlock_test(3): 0
+rwlktest: 4/4 CPUs succeeded
+$
+
+Make sure usertests -q still passes. make grade should pass all tests when you are done.
+Hints
+
+    Take a look at sys_rwlktest in kernel/spinlock.c first; you should be able to test your implementation in stages.
+    Be careful about possible interleavings. For example, if a reader sees no pending writer and wants to acquire the lock for reading, how do you know it's still safe to acquire the lock?
+    It might be helpful to read about the built-in gcc functions for atomic operations; see https://gcc.gnu.org/onlinedocs/gcc/_005f_005fatomic-Builtins.html. 
+
